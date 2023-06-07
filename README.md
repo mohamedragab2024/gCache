@@ -4,7 +4,7 @@
 - [x] Read key
 - [x] Write key
 - [x] Leader - followers
-- [ ] Leader election (uder development using Raft and Blot store)
+- [ ] Leader election (under development using Raft and Blot store)
 - [ ] Disaster recovery under development using write a head log)
 
 #### Build 
