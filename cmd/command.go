@@ -49,13 +49,19 @@ type GetRes struct {
 	Status Status
 	Val    []byte
 }
+type JoinRes struct {
+	Addr []byte
+}
 
-type JoinCmd struct{}
+type JoinCmd struct {
+	Addr []byte
+}
 
 type SetCmd struct {
-	Key      []byte
-	Val      []byte
-	Duration int
+	Key         []byte
+	Val         []byte
+	Replication bool
+	Duration    int
 }
 
 type GetCmd struct {
@@ -77,6 +83,15 @@ func (r *SetRes) GetBytes() []byte {
 	return buf.Bytes()
 }
 
+func (c *JoinCmd) GetBytes() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, Join)
+	len := int32(len(c.Addr))
+	binary.Write(buf, binary.LittleEndian, len)
+	binary.Write(buf, binary.LittleEndian, c.Addr)
+	return buf.Bytes()
+}
+
 func (c *GetCmd) GetBytes() []byte {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, Get)
@@ -94,6 +109,7 @@ func (c *SetCmd) GetBytes() []byte {
 	binary.Write(buf, binary.LittleEndian, int32(len(c.Val)))
 	binary.Write(buf, binary.LittleEndian, c.Val)
 	binary.Write(buf, binary.LittleEndian, int32(c.Duration))
+	binary.Write(buf, binary.LittleEndian, c.Replication)
 	return buf.Bytes()
 }
 
@@ -113,6 +129,12 @@ func ParseSetRes(r io.Reader) (*SetRes, error) {
 	return resp, err
 }
 
+func ParseJoinRes(r io.Reader) (*JoinRes, error) {
+	resp := &JoinRes{}
+	binary.Read(r, binary.LittleEndian, &resp.Addr)
+	return resp, nil
+}
+
 func ParseCmd(r io.Reader) (any, error) {
 	var cmd Command
 	if err := binary.Read(r, binary.LittleEndian, &cmd); err != nil {
@@ -124,7 +146,7 @@ func ParseCmd(r io.Reader) (any, error) {
 	case Get:
 		return parseGetCommand(r), nil
 	case Join:
-		return &JoinCmd{}, nil
+		return parseJoinCommand(r), nil
 	default:
 		return nil, fmt.Errorf("invalid command")
 	}
@@ -146,7 +168,9 @@ func parseSetCommand(r io.Reader) *SetCmd {
 	var ttl int32
 	binary.Read(r, binary.LittleEndian, &ttl)
 	cmd.Duration = int(ttl)
-
+	var replication bool
+	binary.Read(r, binary.LittleEndian, &replication)
+	cmd.Replication = replication
 	return cmd
 }
 
@@ -158,5 +182,14 @@ func parseGetCommand(r io.Reader) *GetCmd {
 	cmd.Key = make([]byte, keyLen)
 	binary.Read(r, binary.LittleEndian, &cmd.Key)
 
+	return cmd
+}
+
+func parseJoinCommand(r io.Reader) *JoinCmd {
+	cmd := &JoinCmd{}
+	var keyLen int32
+	binary.Read(r, binary.LittleEndian, &keyLen)
+	cmd.Addr = make([]byte, keyLen)
+	binary.Read(r, binary.LittleEndian, &cmd.Addr)
 	return cmd
 }

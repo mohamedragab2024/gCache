@@ -25,7 +25,7 @@ type Server struct {
 	ServerOpts
 	followers map[*client.Client]struct{}
 	db        db.DB
-	mu        *sync.Mutex
+	mu        sync.Mutex
 }
 
 func NewServer(opts ServerOpts, db db.DB) *Server {
@@ -39,7 +39,7 @@ func NewServer(opts ServerOpts, db db.DB) *Server {
 func (s *Server) Serve() error {
 	ln, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
-		return fmt.Errorf("Listen error: [%v]", err)
+		return fmt.Errorf("listen error: [%v]", err)
 	}
 
 	if !s.IsLeader && s.ListenAddr != "" {
@@ -56,6 +56,7 @@ func (s *Server) Serve() error {
 		conn, err := ln.Accept()
 		if err != nil {
 			log.Printf("connection error [%v]", err)
+			continue
 		}
 
 		go s.handleConn(conn)
@@ -65,12 +66,14 @@ func (s *Server) Serve() error {
 func (s *Server) dailLeader() error {
 	conn, err := net.Dial("tcp", s.LeaderAddr)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to leader [%v]", err)
+		return fmt.Errorf("failed to connect to leader [%v]", err)
 	}
 
 	log.Println("Connected to leader")
-
-	binary.Write(conn, binary.LittleEndian, cmd.Join)
+	joinCmdBytes := (&cmd.JoinCmd{
+		Addr: []byte(s.ListenAddr),
+	}).GetBytes()
+	binary.Write(conn, binary.LittleEndian, joinCmdBytes)
 
 	s.handleConn(conn)
 
@@ -107,7 +110,13 @@ func (s *Server) handleCommand(conn net.Conn, command any) {
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, command *cmd.SetCmd) error {
+
 	resp := cmd.SetRes{}
+	if !s.IsLeader && !command.Replication {
+		resp.Status = cmd.Error
+		_, err := conn.Write(resp.GetBytes())
+		return err
+	}
 	if err := s.db.Set(command.Key, command.Val, time.Duration(command.Duration)); err != nil {
 		resp.Status = cmd.Error
 		_, err := conn.Write(resp.GetBytes())
@@ -115,9 +124,13 @@ func (s *Server) handleSetCommand(conn net.Conn, command *cmd.SetCmd) error {
 	}
 	resp.Status = cmd.OK
 	_, err := conn.Write(resp.GetBytes())
-	if err == nil {
-		go s.Replicate(command)
-	}
+	go func() {
+		for peer := range s.followers {
+			if err := peer.Replicate(context.TODO(), command.Key, command.Val, command.Duration); err != nil {
+				log.Println("replicating to follower error:", err)
+			}
+		}
+	}()
 	return err
 }
 
@@ -142,14 +155,11 @@ func (s *Server) handleJoinCommand(conn net.Conn, command *cmd.JoinCmd) error {
 	log.Println("New follower joined: ", conn.RemoteAddr())
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.followers[client.New(conn)] = struct{}{}
-	return nil
-}
-
-func (s *Server) Replicate(command *cmd.SetCmd) {
-	for f := range s.followers {
-		if err := f.Set(context.Background(), command.Key, command.Val, command.Duration); err != nil {
-			log.Printf("Error replicating to follower [%d]", err)
-		}
+	c, err := client.Connect(string(command.Addr), client.Options{})
+	if err != nil {
+		log.Printf("error join cluster [%s]", string(command.Addr))
+		return nil
 	}
+	s.followers[c] = struct{}{}
+	return nil
 }
