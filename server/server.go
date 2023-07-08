@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/ragoob/gCache/client"
@@ -24,6 +25,7 @@ type Server struct {
 	ServerOpts
 	followers map[*client.Client]struct{}
 	db        db.DB
+	mu        *sync.Mutex
 }
 
 func NewServer(opts ServerOpts, db db.DB) *Server {
@@ -105,7 +107,6 @@ func (s *Server) handleCommand(conn net.Conn, command any) {
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, command *cmd.SetCmd) error {
-	go s.Replicate(command)
 	resp := cmd.SetRes{}
 	if err := s.db.Set(command.Key, command.Val, time.Duration(command.Duration)); err != nil {
 		resp.Status = cmd.Error
@@ -114,7 +115,9 @@ func (s *Server) handleSetCommand(conn net.Conn, command *cmd.SetCmd) error {
 	}
 	resp.Status = cmd.OK
 	_, err := conn.Write(resp.GetBytes())
-
+	if err == nil {
+		go s.Replicate(command)
+	}
 	return err
 }
 
@@ -137,6 +140,8 @@ func (s *Server) handleGetCommand(conn net.Conn, command *cmd.GetCmd) error {
 
 func (s *Server) handleJoinCommand(conn net.Conn, command *cmd.JoinCmd) error {
 	log.Println("New follower joined: ", conn.RemoteAddr())
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.followers[client.New(conn)] = struct{}{}
 	return nil
 }
