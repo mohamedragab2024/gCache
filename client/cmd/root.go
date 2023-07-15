@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/olekukonko/tablewriter"
-	"github.com/ragoob/gCache/pkg/client"
+	"github.com/ragoob/gCache/pkg/grpc/client"
 	"github.com/spf13/cobra"
 	"os"
 	"strings"
@@ -33,7 +33,7 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-	rootCmd.Flags().StringVarP(&serverAddr, "serveraddr", "s", ":3000", "Server address")
+	rootCmd.Flags().StringVarP(&serverAddr, "serveraddr", "s", ":8080", "Server address")
 	defer gClient.Close()
 
 	if err := rootCmd.Execute(); err != nil {
@@ -43,7 +43,6 @@ func Execute() {
 }
 
 func runRoot(cmd *cobra.Command, args []string) {
-
 	scanner := bufio.NewScanner(os.Stdin)
 	welcomePrint()
 

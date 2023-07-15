@@ -1,15 +1,84 @@
-package server
+package old
 
 import (
 	"context"
-	"github.com/ragoob/gCache/cmd"
+	"encoding/binary"
+	"fmt"
 	"github.com/ragoob/gCache/pkg/client"
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
+
+	"github.com/ragoob/gCache/cmd"
+	"github.com/ragoob/gCache/db"
 )
 
+type ServerOpts struct {
+	ListenAddr string
+	IsLeader   bool
+	LeaderAddr string
+}
+
+type Server struct {
+	ServerOpts
+	followers map[*client.Client]struct{}
+	db        db.DB
+	mu        sync.Mutex
+}
+
+func NewServer(opts ServerOpts, db db.DB) *Server {
+	return &Server{
+		ServerOpts: opts,
+		db:         db,
+		followers:  make(map[*client.Client]struct{}),
+	}
+}
+
+func (s *Server) Serve() error {
+	ln, err := net.Listen("tcp", s.ListenAddr)
+	if err != nil {
+		return fmt.Errorf("listen error: [%v]", err)
+	}
+
+	if !s.IsLeader && s.ListenAddr != "" {
+		go func() {
+			if err := s.dailLeader(); err != nil {
+				log.Println(err)
+			}
+		}()
+	}
+
+	log.Printf("Server started [%s]", s.ListenAddr)
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Printf("connection error [%v]", err)
+			continue
+		}
+
+		go s.handleConn(conn)
+	}
+}
+
+func (s *Server) dailLeader() error {
+	conn, err := net.Dial("tcp", s.LeaderAddr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to leader [%v]", err)
+	}
+
+	log.Println("Connected to leader")
+	joinCmdBytes := (&cmd.JoinCmd{
+		Addr: []byte(s.ListenAddr),
+	}).GetBytes()
+	binary.Write(conn, binary.LittleEndian, joinCmdBytes)
+
+	s.handleConn(conn)
+
+	return nil
+}
 func (s *Server) handleConn(conn net.Conn) {
 	defer conn.Close()
 
