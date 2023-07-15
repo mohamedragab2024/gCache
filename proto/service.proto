@@ -5,8 +5,6 @@ option go_package = " github.com/ragoob/gCache/proto";
 service GCacheService {
   rpc Set(SetRequest) returns (SetResponse) {}
   rpc Get(GetRequest) returns (GetResponse) {}
-  rpc Join(JoinRequest) returns (JoinResponse) {}
-
 }
 
 message SetRequest {
@@ -24,15 +22,4 @@ message GetRequest {
 
 message GetResponse {
   bytes value = 1;
-}
-
-
-// Request message for the Join RPC method
-message JoinRequest {
-  string addr = 1;
-}
-
-// Response message for the Join RPC method
-message JoinResponse {
-  bool success = 1;
 }

@@ -90,14 +90,7 @@ func (s *Server) Set(ctx context.Context, req *pb.SetRequest) (*pb.SetResponse, 
 	if err := s.db.Set(command.Key, command.Val, time.Duration(command.Duration)); err != nil {
 		return &pb.SetResponse{Success: false}, err
 	}
-	// set the value to the followers replicas
-	go func() {
-		for peer := range s.followers {
-			if err := peer.Replicate(context.TODO(), command.Key, command.Val, command.Duration); err != nil {
-				log.Println("replicating to follower error:", err)
-			}
-		}
-	}()
+
 	// complete set value
 	return &pb.SetResponse{Success: true}, nil
 }

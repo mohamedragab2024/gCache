@@ -24,7 +24,6 @@ const _ = grpc.SupportPackageIsVersion7
 type GCacheServiceClient interface {
 	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SetResponse, error)
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
-	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error)
 }
 
 type gCacheServiceClient struct {
@@ -53,22 +52,12 @@ func (c *gCacheServiceClient) Get(ctx context.Context, in *GetRequest, opts ...g
 	return out, nil
 }
 
-func (c *gCacheServiceClient) Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error) {
-	out := new(JoinResponse)
-	err := c.cc.Invoke(ctx, "/proto.GCacheService/Join", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // GCacheServiceServer is the server API for GCacheService service.
 // All implementations must embed UnimplementedGCacheServiceServer
 // for forward compatibility
 type GCacheServiceServer interface {
 	Set(context.Context, *SetRequest) (*SetResponse, error)
 	Get(context.Context, *GetRequest) (*GetResponse, error)
-	Join(context.Context, *JoinRequest) (*JoinResponse, error)
 	mustEmbedUnimplementedGCacheServiceServer()
 }
 
@@ -81,9 +70,6 @@ func (UnimplementedGCacheServiceServer) Set(context.Context, *SetRequest) (*SetR
 }
 func (UnimplementedGCacheServiceServer) Get(context.Context, *GetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
-}
-func (UnimplementedGCacheServiceServer) Join(context.Context, *JoinRequest) (*JoinResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Join not implemented")
 }
 func (UnimplementedGCacheServiceServer) mustEmbedUnimplementedGCacheServiceServer() {}
 
@@ -134,24 +120,6 @@ func _GCacheService_Get_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GCacheService_Join_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(JoinRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GCacheServiceServer).Join(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/proto.GCacheService/Join",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GCacheServiceServer).Join(ctx, req.(*JoinRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // GCacheService_ServiceDesc is the grpc.ServiceDesc for GCacheService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -166,10 +134,6 @@ var GCacheService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Get",
 			Handler:    _GCacheService_Get_Handler,
-		},
-		{
-			MethodName: "Join",
-			Handler:    _GCacheService_Join_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
