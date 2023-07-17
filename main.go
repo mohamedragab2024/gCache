@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 
 	"github.com/ragoob/gCache/db"
 	"github.com/ragoob/gCache/server"
@@ -20,6 +21,9 @@ func main() {
 	}
 
 	s := server.NewServer(opts, db.New())
-	s.Serve()
+
+	if err := s.Serve(); err != nil {
+		log.Fatalf("Serve Error : %+v", err)
+	}
 
 }

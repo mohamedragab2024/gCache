@@ -109,7 +109,7 @@ func (c *SetCmd) GetBytes() []byte {
 	binary.Write(buf, binary.LittleEndian, int32(len(c.Val)))
 	binary.Write(buf, binary.LittleEndian, c.Val)
 	binary.Write(buf, binary.LittleEndian, int32(c.Duration))
-	binary.Write(buf, binary.LittleEndian, c.Replication)
+	binary.Write(buf, binary.LittleEndian, c.Duration)
 	return buf.Bytes()
 }
 
@@ -192,4 +192,17 @@ func parseJoinCommand(r io.Reader) *JoinCmd {
 	cmd.Addr = make([]byte, keyLen)
 	binary.Read(r, binary.LittleEndian, &cmd.Addr)
 	return cmd
+}
+
+func ParseSetCommand(r io.Reader) (*SetCmd, error) {
+	var cmd Command
+	if err := binary.Read(r, binary.LittleEndian, &cmd); err != nil {
+		return nil, err
+	}
+	switch cmd {
+	case Set:
+		return parseSetCommand(r), nil
+	default:
+		return nil, fmt.Errorf("invalid command")
+	}
 }

@@ -9,6 +9,8 @@ import (
 type DB interface {
 	Set([]byte, []byte, time.Duration) error
 	Get([]byte) ([]byte, error)
+	Store() map[string][]byte
+	Clear()
 }
 
 type Cache struct {
@@ -42,4 +44,16 @@ func (c *Cache) Set(key []byte, val []byte, duration time.Duration) error {
 	c.store[k] = val
 
 	return nil
+}
+
+func (c *Cache) Store() map[string][]byte {
+	return c.store
+}
+
+func (c *Cache) Clear() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// Clear the existing store
+	c.store = make(map[string][]byte)
 }
